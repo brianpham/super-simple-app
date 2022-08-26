@@ -1,0 +1,71 @@
+name: Generate
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        default: 'dev'
+        description: Environment
+        required: true
+      tag:
+        default: 'latest'
+        description: Tag
+        required: false
+      dry-run:
+        type: boolean
+        description: Dry-run Only
+        required: false
+        default: true
+      debug:
+        type: boolean
+        description: Start upterm session
+        required: false
+        default: false
+
+jobs:
+  job_name:
+    name: Generate
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Branch
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install Dependencies
+        run: |
+          sh scripts/install.sh
+
+      # Generate deployment and clean up any artifacts
+      - name: Generate Deployment Manifest
+        run: | 
+          python3 scripts/verify.py
+          echo "New generated manifest shown below:"
+          cat deployment.tf
+          mv deployment.tf $GITHUB_WORKSPACE/terraform/environments/dev
+          sudo rm -r $GITHUB_WORKSPACE/bin
+        env: 
+          TAG: ${{ github.event.inputs.tag }}
+
+      - name: Setup upterm session
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.debug }}
+        uses: lhotari/action-upterm@v1
+
+      - name: Create GitHub Branch
+        if: ${{ github.event.inputs.dry-run == 'false' }}
+        uses: devops-infra/action-commit-push@v0.9.0
+        with:
+          github_token: "${{ secrets.GH_PAT_TOKEN }}"
+          commit_message: "[GHA] Update static app version to ${{ github.event.inputs.tag }}"
+          force: false
+          target_branch: dev/static-app/${{ github.event.inputs.tag }}
+
+      - name: Create GitHub Pull Request
+        if: ${{ github.event.inputs.dry-run == 'false' }}
+        uses: devops-infra/action-pull-request@v0.5.0
+        with:
+          github_token: ${{ secrets.GH_PAT_TOKEN }}
+          source_branch: dev/static-app/${{ github.event.inputs.tag }}
+          target_branch: main
+          allow_no_diff: false
