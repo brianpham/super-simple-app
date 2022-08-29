@@ -21,7 +21,7 @@ resource "kubernetes_deployment" "supersimpleapp" {
       }
       spec {
         container {
-          image = "ghcr.io/brianpham/supersimpleapp:de0846d"
+          image = "ghcr.io/brianpham/supersimpleapp:48594f5"
           name  = "ssa"
 
           port {
